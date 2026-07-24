@@ -21,6 +21,7 @@ cost_limit: 1.5
 wall_time_limit_seconds: 3600   # 1h hard cap, ends the run cleanly so the patch still gets extracted
 command_timeout: 900            # 15 min per command, kept under the wall-clock cap on purpose
 container_timeout: 70m          # just above wall_time_limit_seconds, buffer for scrub/setup/diff steps
+max_consecutive_format_errors: 10
 
 api_key_env: OPENROUTER_API_KEY
 container_health_timeout: 600

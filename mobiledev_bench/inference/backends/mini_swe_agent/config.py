@@ -35,6 +35,13 @@ class MiniSweAgentConfig:
     # deadline, so this isn't tightened by default; see mini_swe_agent_rebuttal.yaml for a
     # tightened example.
     wall_time_limit_seconds: int = 0
+    # DefaultAgent.max_consecutive_format_errors - consecutive malformed/missing tool-call
+    # responses (e.g. a provider returning no tool_calls, or a native finish_reason like Gemini's
+    # MALFORMED_FUNCTION_CALL) before the instance is abandoned with exit_status=
+    # RepeatedFormatError. These attempts are typically billed at $0 (the call fails before the
+    # harness's own cost tracking captures it), so raising this is low-risk - it just gives a
+    # flaky provider more chances to recover mid-run. Matches the library's own default (3).
+    max_consecutive_format_errors: int = 3
     # Reused as DockerEnvironmentConfig.pull_timeout (image pull) - there's no in-container HTTP
     # server to health-check here, unlike the openhands backend. Matches android-bench's own
     # pull_timeout (600) rather than the shared CLI default (120), which is tuned for openhands.

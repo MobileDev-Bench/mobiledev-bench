@@ -222,6 +222,7 @@ def run_instance(
             step_limit=cfg.step_limit,
             cost_limit=cfg.cost_limit,
             wall_time_limit_seconds=cfg.wall_time_limit_seconds,
+            max_consecutive_format_errors=cfg.max_consecutive_format_errors,
             # DefaultAgent.run() already calls self.save(output_path) after every step (not just
             # at the end) when this is set, so the native trajectory is saved incrementally for
             # free - crash-resilient the same way our own harness-level JSON below is not.
