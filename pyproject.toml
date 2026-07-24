@@ -7,7 +7,7 @@ name = "mobiledev-bench"
 version = "0.1.0"
 description = "MobileDev-Bench: A Benchmark for Issue Resolution in Mobile Application Development"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = [
     "aiohttp",
     "dataclasses-json>=0.6.0",
