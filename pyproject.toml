@@ -16,6 +16,10 @@ dependencies = [
     "ghapi",
     "GitPython",
     "openai>=1.0.0",
+    "mini-swe-agent~=2.4.6",
+    "openhands-sdk~=1.34",
+    "openhands-tools~=1.34",
+    "openhands-workspace~=1.34",
     "pandas",
     "python-dotenv",
     "pyyaml",
@@ -29,6 +33,7 @@ dependencies = [
 
 [project.scripts]
 mobiledev-eval = "mobiledev_bench.harness.run_evaluation:main"
+mobiledev-infer = "mobiledev_bench.inference.run_inference:main"
 
 [tool.uv]
 dev-dependencies = []

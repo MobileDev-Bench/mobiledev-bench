@@ -1,0 +1,46 @@
+# Time-boxed config for the rebuttal run: 407 instances x 4 models across 4 machines,
+# 1 worker each, no spare parallelism to route around a stuck instance.
+#
+# mobiledev-infer --config mobiledev_bench/inference/backends/mini_swe_agent_rebuttal.yaml \
+#     --dataset_files path/to/dataset.jsonl --model <model for this machine> --max_workers 1
+#
+# Worst case (every instance hits the cap): 407 x 60min ~= 407h ~= 16.96 days per machine -
+# over 4x the 4-day window if every instance were to max out. This is a deliberate, accepted
+# risk to give the agent more real turns per instance (step_limit=250 is still unreachable at
+# this cap - see the chat explanation). The pilot run below is not optional at this margin:
+# without checking real average per-instance time first, there is no basis for expecting this
+# to land inside 4 days rather than inside 17.
+
+agent_backend: mini_swe_agent
+dataset_files:
+  - path/to/dataset.jsonl
+max_workers: 1
+
+step_limit: 250
+cost_limit: 1.5
+wall_time_limit_seconds: 3600   # 1h hard cap, ends the run cleanly so the patch still gets extracted
+command_timeout: 900            # 15 min per command, kept under the wall-clock cap on purpose
+container_timeout: 70m          # just above wall_time_limit_seconds, buffer for scrub/setup/diff steps
+
+api_key_env: OPENROUTER_API_KEY
+container_health_timeout: 600
+docker_platform: linux/amd64
+reasoning_config_file: mobiledev_bench/inference/backends/mini_swe_agent_reasoning.yaml
+
+# Each of the 4 lab machines needs this: instance images aren't resolvable from a bare tag on a
+# fresh machine (Docker looks on Docker Hub by default, these live on GHCR) - without this every
+# instance fails immediately with "pull access denied". Also deletes each image again right after
+# its instance finishes, since 407 unique multi-GB images left cached would exhaust disk space
+# well before the batch completes.
+use_remote_images: true
+ghcr_username: mobiledev-bench
+
+# One model per machine, set via --model on each:
+#   openrouter/anthropic/claude-sonnet-4.5
+#   openrouter/qwen/qwen3-coder
+#   openrouter/openai/gpt-5.2
+#   openrouter/google/gemini-2.5-flash
+model: openrouter/anthropic/claude-sonnet-4.5
+
+output_dir: results
+# run_name:   unset - defaults to a timestamp per invocation, same as the base config

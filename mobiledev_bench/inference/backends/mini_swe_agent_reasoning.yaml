@@ -1,0 +1,8 @@
+# Passed via --reasoning_config_file (or set in mini_swe_agent.yaml). Same idea as android-bench's
+# reasoning_config block: a default effort for every model, with per-model overrides.
+default:
+  reasoning_effort: high
+openai/gpt-5.2:
+  reasoning_effort: xhigh
+openai/gpt-5.2-codex:
+  reasoning_effort: xhigh
