@@ -28,6 +28,7 @@ from mobiledev_bench.harness.test_result import Test, TestResult
 @dataclass_json
 @dataclass
 class Dataset(PullRequest):
+    problem_statement: str = ""
     fixed_tests: dict[str, Test] = field(default_factory=dict)
     p2p_tests: dict[str, Test] = field(default_factory=dict)
     f2p_tests: dict[str, Test] = field(default_factory=dict)
