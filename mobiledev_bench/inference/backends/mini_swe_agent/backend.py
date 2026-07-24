@@ -34,6 +34,9 @@ class MiniSweAgentBackend(Backend):
             wall_time_limit_seconds=cli.wall_time_limit_seconds
             if cli.wall_time_limit_seconds is not None
             else defaults.wall_time_limit_seconds,
+            max_consecutive_format_errors=cli.max_consecutive_format_errors
+            if cli.max_consecutive_format_errors is not None
+            else defaults.max_consecutive_format_errors,
             docker_platform=cli.docker_platform,
         )
 

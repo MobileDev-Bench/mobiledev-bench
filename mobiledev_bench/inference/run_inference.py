@@ -112,6 +112,15 @@ def get_parser() -> ArgumentParser:
         "default (0 = unlimited).",
     )
     parser.add_argument(
+        "--max_consecutive_format_errors",
+        type=int,
+        required=False,
+        default=None,
+        help="mini_swe_agent backend only. Consecutive malformed/missing tool-call responses "
+        "before the instance is abandoned with exit_status=RepeatedFormatError. Unset uses that "
+        "backend's own default (MiniSweAgentConfig.max_consecutive_format_errors).",
+    )
+    parser.add_argument(
         "--docker_platform",
         type=str,
         required=False,
@@ -193,6 +202,7 @@ class CliArgs:
     command_timeout: Optional[int]
     container_timeout: Optional[str]
     wall_time_limit_seconds: Optional[int]
+    max_consecutive_format_errors: Optional[int]
     docker_platform: Optional[str]
     openhands_pip_spec: Optional[str]
     global_env: Optional[list[str]]
