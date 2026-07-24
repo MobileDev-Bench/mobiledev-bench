@@ -6,6 +6,7 @@ selected via `--agent_backend` (default: "openhands")."""
 
 import concurrent.futures
 import glob
+import json
 import logging
 import os
 import sys
@@ -343,6 +344,36 @@ class CliArgs:
         return self.run_dir / PATCHES_WORKDIR
 
     @property
+    def patches_path(self) -> Path:
+        return self.patches_dir / PATCHES_FILE
+
+    @property
+    def resumed_ids(self) -> set[str]:
+        """Instance ids that already have a patch recorded under this --run_name. Reusing a
+        run_name after a crash/interrupt resumes it: run() skips these when building
+        `dataset`/`instances` and appends rather than overwrites `patches_path`, instead of
+        redoing (and re-billing) every instance from scratch. A fresh/timestamp-default run_name
+        naturally has no existing patches_path, so this is a no-op for a normal first run."""
+        if not hasattr(self, "_resumed_ids"):
+            self._resumed_ids: set[str] = set()
+            if self.patches_path.exists():
+                with open(self.patches_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        record = json.loads(line)
+                        self._resumed_ids.add(
+                            f"{record['org']}/{record['repo']}:pr-{record['number']}"
+                        )
+                if self._resumed_ids:
+                    self.logger.info(
+                        f"Resuming run '{self.run_name}': {len(self._resumed_ids)} instance(s) "
+                        f"already have a patch in {self.patches_path}, skipping them."
+                    )
+        return self._resumed_ids
+
+    @property
     def api_key(self) -> Optional[str]:
         return os.environ.get(self.api_key_env)
 
@@ -376,6 +407,8 @@ class CliArgs:
                         if not self.check_specific(dataset.id):
                             continue
                         if self.check_skip(dataset.id):
+                            continue
+                        if dataset.id in self.resumed_ids:
                             continue
                         self._dataset[dataset.id] = dataset
 
@@ -465,14 +498,18 @@ class CliArgs:
     def run(self) -> None:
         instances = self.instances
         if not instances:
-            self.logger.info("No instances to run, finishing.")
+            if self.resumed_ids:
+                self.logger.info(
+                    "All instances already have a patch from a previous run, nothing to do."
+                )
+            else:
+                self.logger.info("No instances to run, finishing.")
             return
 
         workers = min(self.max_workers, len(instances))
         self.logger.info(f"Preparing to run inference on {len(instances)} instances with {workers} workers.")
 
         self.patches_dir.mkdir(parents=True, exist_ok=True)
-        patches_path = self.patches_dir / PATCHES_FILE
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
             futures = {
@@ -481,7 +518,10 @@ class CliArgs:
             }
 
             completed = 0
-            with open(patches_path, "w", encoding="utf-8") as patches_file:
+            # Append, not overwrite: resumed_ids already filtered `instances` down to the ones
+            # not yet recorded here, so this only ever adds newly-finished patches alongside
+            # whatever a previous, interrupted run under this same --run_name already wrote.
+            with open(self.patches_path, "a", encoding="utf-8") as patches_file:
                 for future in tqdm(
                     concurrent.futures.as_completed(futures),
                     total=len(futures),
@@ -504,7 +544,7 @@ class CliArgs:
                             docker_util.cleanup_containers(self.logger, status_filter="exited")
 
         docker_util.cleanup_containers(self.logger, status_filter="exited")
-        self.logger.info(f"Inference finished. Patches written to {patches_path}")
+        self.logger.info(f"Inference finished. Patches written to {self.patches_path}")
 
 
 def main():
