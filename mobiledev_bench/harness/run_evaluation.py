@@ -288,7 +288,7 @@ class CliArgs:
         if not isinstance(self.workdir, Path):
             raise ValueError(f"Invalid workdir: {self.workdir}")
         if not self.workdir.exists():
-            raise ValueError(f"Workdir not found: {self.workdir}")
+            self.workdir.mkdir(parents=True, exist_ok=True)
 
     def _check_patch_files(self):
         if not self.patch_files:
@@ -435,7 +435,11 @@ class CliArgs:
                         if line.strip() == "":
                             continue
 
-                        dataset = Dataset.from_json(line)
+                        # Tolerant of a raw dataset-release record (missing run_result/
+                        # test_patch_result/fix_patch_result, possible double-JSON-encoding) -
+                        # evaluation never reads those fields either, only real test output
+                        # produced by actually running the tests.
+                        dataset = Dataset.from_raw_json(line)
                         if not self.check_specific(dataset.id):
                             continue
                         if self.check_skip(dataset.id):
@@ -903,17 +907,34 @@ class CliArgs:
             raise ValueError(f"Invalid mode: {self.mode}")
 
 
-if __name__ == "__main__":
-    # Ensure nix_swe container is runningAdd commentMore actions
+def _ensure_nix_swe_container():
+    """Only needed by session_util.run_and_save_logs's swerex/Nix-based path, which only runs
+    when --human_mode is False (run_evaluation.py's own patch-run branch, ~line 775) - the
+    default (--human_mode true, i.e. a human-curated dataset) never touches it. Gating this
+    behind that same condition means a default run doesn't pay for, or risk failing on, a
+    container it will never actually use."""
     try:
         client = docker.from_env()
         try:
-            container = client.containers.get("nix_swe")
+            client.containers.get("nix_swe")
         except docker.errors.NotFound:
             client.containers.run("mswebench/nix_swe:v1.0", "true", name="nix_swe")
     except Exception as e:
         print(f"Error starting nix_swe container: {e}")
         sys.exit(1)
+
+
+def main():
+    parser = get_parser()
+    args = parser.parse_args()
+    cli = CliArgs.from_dict(vars(args))
+    if not cli.human_mode:
+        _ensure_nix_swe_container()
+    cli.run()
+
+
+if __name__ == "__main__":
+    main()
 
     parser = get_parser()
     args = parser.parse_args()
