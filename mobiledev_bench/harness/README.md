@@ -4,6 +4,8 @@ Applies a `patches.jsonl` file (produced by `mobiledev-infer`, see `mobiledev_be
 
 ## Quick start
 
+### Run Evaluation
+
 ```bash
 mobiledev_bench/harness/run_evaluation.sh <run_name> <model_dir>
 ```
@@ -30,7 +32,7 @@ To evaluate several models' patches in one call instead, glob `--patch_files` di
 
 Interrupted or killed partway through? Just rerun the same command with the same `--workdir` (the script always derives the same one from `<run_name>`/`<model_dir>`) - instances that already have a `report.json` are skipped automatically, see "Resume" below.
 
-## Modes
+#### Modes
 
 `--mode` controls what `mobiledev-eval` actually does. Four values:
 
@@ -41,7 +43,7 @@ Interrupted or killed partway through? Just rerun the same command with the same
 
 For scoring patches against the published dataset, `evaluation` with `--use_remote_images true` is what you want - that's what the wrapper script above sets up.
 
-## Options
+#### Options
 
 The full set is in `mobiledev-eval --help`; these are the ones you'll actually touch:
 
@@ -63,12 +65,12 @@ The full set is in `mobiledev-eval --help`; these are the ones you'll actually t
 
 Same convention as inference: `--config` only fills in flags still at their argparse default, so an explicit CLI flag always wins.
 
-## Resume & progress
+#### Resume & progress
 
 - **Progress**: tqdm progress bars at every phase - image building, running instances, and (in `gen_report.py`) building the final report.
 - **Resume**: each instance's result is checked before it runs (`run_instance()`, `run_evaluation.py:732-735`) - if `<workdir>/<org>/<repo>/evals/.../report.json` already exists, that instance is skipped instead of re-run. Re-running the exact same command after a crash or manual interruption picks up where it left off, as long as `--workdir` points at the same place. It does *not* resume a check that was killed mid-flight (no partial-report handling) - only whole, already-completed instances are skipped.
 
-## Output
+#### Output
 
 ```
 <output_dir>/
@@ -79,6 +81,35 @@ Same convention as inference: `--config` only fills in flags still at their argp
 ```
 
 An instance with an empty `fix_patch` (the agent never produced one) is skipped before any image pull or container work - logged and scored as unresolved, not treated as an error.
+
+
+### Gen Report
+
+`final_report.json` only gets written once, at the very end of the full `mobiledev-eval` run - for a large batch that could be days off. Run `gen_report.py` standalone, pointed at the same `--workdir`, to snapshot whatever's completed so far without waiting for the rest:
+
+```bash
+python -m mobiledev_bench.harness.gen_report \
+  --mode evaluation \
+  --workdir <same --workdir the running mobiledev-eval command is using> \
+  --dataset_files data/dataset_with_baselines.jsonl \
+  --output_dir <somewhere to write this snapshot's final_report.json> \
+  --log_dir <somewhere for its own log>
+```
+
+Real example, checking progress on a live `openrouter-qwen-qwen3-coder` run:
+
+```bash
+python -m mobiledev_bench.harness.gen_report \
+  --mode evaluation \
+  --workdir results/evaluation/mini_swe_agent/openrouter-qwen-qwen3-coder/work \
+  --dataset_files data/dataset_with_baselines.jsonl \
+  --output_dir results/evaluation/mini_swe_agent/openrouter-qwen-qwen3-coder/snapshot \
+  --log_dir results/evaluation/mini_swe_agent/openrouter-qwen-qwen3-coder/snapshot/logs
+```
+
+Needs `data/dataset_with_baselines.jsonl` specifically, not the placeholder-only `data/dataset.jsonl` used above - scoring `resolved` vs `unresolved` requires the real baseline `run_result`/`test_patch_result` to compare the fix stage against, and the placeholder file has those as `null`.
+
+Safe to run repeatedly alongside the live process, but it is not purely read-only: `collect_report_tasks()` scans `<workdir>/<org>/<repo>/evals/` for whatever's on disk, and for every instance whose `fix-patch-run.log` is already complete it writes that instance's `report.json` in place - the same file `run_evaluation.py`'s own resume check looks for (see "Resume & progress" above), so this is consistent with, not disruptive to, the live run. Instances still mid-run (no `fix-patch-run.log` yet) show up as `error_instances` in the snapshot ("Fix patch run log file not found") rather than getting a premature report.
 
 ## Troubleshooting
 
