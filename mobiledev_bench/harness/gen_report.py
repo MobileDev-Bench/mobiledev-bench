@@ -295,7 +295,12 @@ class CliArgs:
                         if line.strip() == "":
                             continue
 
-                        dataset = Dataset.from_json(line)
+                        # Not from_json: a subset of records have base/resolved_issues/*_tests
+                        # double-JSON-encoded as a string (see normalize_raw_record) - from_json
+                        # has no tolerance for that and raises. from_raw_json fixes it without
+                        # touching run_result/test_patch_result/fix_patch_result, which are
+                        # already populated here (setdefault is a no-op when present).
+                        dataset = Dataset.from_raw_json(line)
 
                         if not self.check_specific(dataset.id):
                             continue
