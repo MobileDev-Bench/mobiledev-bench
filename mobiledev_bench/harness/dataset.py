@@ -108,6 +108,10 @@ _EMPTY_TEST_RESULT = {
 # Observed in the wild: some records in a published release have these dict/list-typed fields
 # JSON-encoded as a string instead of native JSON (a double-encoding artifact of how a subset of
 # the release was exported), and some have test_command as a NaN float instead of a string/null.
+# run_result/test_patch_result/fix_patch_result are absent (not just double-encoded) in the raw
+# release itself - see _TEST_RESULT_FIELDS below - but a scored variant of the dataset (one with
+# real baselines filled in, e.g. for gen_report.py's --mode evaluation) can carry the same
+# double-encoding quirk on these three once they're actually populated.
 _POSSIBLY_DOUBLE_ENCODED_FIELDS = (
     "base",
     "resolved_issues",
@@ -116,6 +120,9 @@ _POSSIBLY_DOUBLE_ENCODED_FIELDS = (
     "p2p_tests",
     "s2p_tests",
     "fixed_tests",
+    "run_result",
+    "test_patch_result",
+    "fix_patch_result",
 )
 
 
