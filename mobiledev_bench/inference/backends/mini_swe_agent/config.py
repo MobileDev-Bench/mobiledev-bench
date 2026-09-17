@@ -42,6 +42,10 @@ class MiniSweAgentConfig:
     # harness's own cost tracking captures it), so raising this is low-risk - it just gives a
     # flaky provider more chances to recover mid-run. Matches the library's own default (3).
     max_consecutive_format_errors: int = 3
+    # Passed straight through to OpenRouterModel's multimodal_regex config field. None/empty
+    # disables multimodal processing (the library's own default) - see run_inference.py's
+    # --multimodal_regex help text for the expected tag format.
+    multimodal_regex: Optional[str] = None
     # Reused as DockerEnvironmentConfig.pull_timeout (image pull) - there's no in-container HTTP
     # server to health-check here, unlike the openhands backend. Matches android-bench's own
     # pull_timeout (600) rather than the shared CLI default (120), which is tuned for openhands.

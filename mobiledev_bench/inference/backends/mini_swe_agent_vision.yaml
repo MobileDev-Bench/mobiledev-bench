@@ -1,0 +1,45 @@
+# Vision-enabled run for the reviewer question "are there UI-level bugs that need a visual LLM
+# to fix". Same scaffold/methodology as mini_swe_agent.yaml, run only against
+# data/dataset_vision.jsonl (built by scripts/build_vision_dataset.py: the 98 instances whose
+# GitHub issue has at least one image attachment, per manual annotation), so resolution rate
+# here is directly comparable to each model's existing text-only resolution rate on the same 98
+# instances.
+#
+# multimodal_regex turns on mini-swe-agent's OpenRouterModel multimodal expansion (off by
+# default everywhere else in this repo) - without it, the
+# <MSWEA_MULTIMODAL_CONTENT>...</MSWEA_MULTIMODAL_CONTENT> tags build_vision_dataset.py appended
+# to problem_statement would just be sent to the model as literal text, not images.
+#
+# Only 3 models run here, not the usual 4 - qwen3-coder is a code-only model with no vision
+# support via OpenRouter, and per instruction we are not substituting a vision Qwen variant for
+# this pass (fewer models, but no risk of an unfairly-mismatched substitute skewing the
+# comparison).
+#
+# mobiledev-infer --config mobiledev_bench/inference/backends/mini_swe_agent_vision.yaml \
+#     --dataset_files data/dataset_vision.jsonl --model <model for this run>
+
+agent_backend: mini_swe_agent
+dataset_files:
+  - data/dataset_vision.jsonl
+
+multimodal_regex: (?s)<MSWEA_MULTIMODAL_CONTENT><CONTENT_TYPE>(.+?)</CONTENT_TYPE>(.+?)</MSWEA_MULTIMODAL_CONTENT>
+
+step_limit: 250
+cost_limit: 1.5
+api_key_env: OPENROUTER_API_KEY
+container_health_timeout: 600
+docker_platform: linux/amd64
+reasoning_config_file: mobiledev_bench/inference/backends/mini_swe_agent_reasoning.yaml
+
+use_remote_images: true
+ghcr_username: mobiledev-bench
+
+# One of these per run, set via --model:
+#   openrouter/anthropic/claude-sonnet-4.5
+#   openrouter/openai/gpt-5.2
+#   openrouter/google/gemini-2.5-flash
+model: openrouter/anthropic/claude-sonnet-4.5
+
+output_dir: results             # results/<run_name>/<agent_backend>/<model>/...
+# run_name:                     # defaults to a timestamp; set to group these 3 runs under one batch id
+# max_workers: 4                # each worker holds one live container

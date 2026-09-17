@@ -212,6 +212,7 @@ def run_instance(
             # onto the model config) - see templates.py.
             format_error_template=FORMAT_ERROR_TEMPLATE,
             observation_template=OBSERVATION_TEMPLATE,
+            multimodal_regex=cfg.multimodal_regex or "",
         )
 
         agent = DefaultAgent(

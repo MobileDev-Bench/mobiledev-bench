@@ -122,6 +122,18 @@ def get_parser() -> ArgumentParser:
         "backend's own default (MiniSweAgentConfig.max_consecutive_format_errors).",
     )
     parser.add_argument(
+        "--multimodal_regex",
+        type=str,
+        required=False,
+        default=None,
+        help="mini_swe_agent backend only. Regex passed to OpenRouterModel's multimodal_regex "
+        "config - when set, task/observation strings containing "
+        "<MSWEA_MULTIMODAL_CONTENT><CONTENT_TYPE>image_url</CONTENT_TYPE>{url}"
+        "</MSWEA_MULTIMODAL_CONTENT> tags are expanded into real image_url content blocks sent "
+        "to the model. Unset (None) disables multimodal processing entirely, matching the "
+        "library's own default - existing text-only runs are unaffected.",
+    )
+    parser.add_argument(
         "--docker_platform",
         type=str,
         required=False,
@@ -204,6 +216,7 @@ class CliArgs:
     container_timeout: Optional[str]
     wall_time_limit_seconds: Optional[int]
     max_consecutive_format_errors: Optional[int]
+    multimodal_regex: Optional[str]
     docker_platform: Optional[str]
     openhands_pip_spec: Optional[str]
     global_env: Optional[list[str]]
