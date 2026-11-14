@@ -1,0 +1,11 @@
+# Reasoning effort for the interface-specification rerun: `high` for every model.
+#
+# The baseline GPT-5.2 run recorded reasoning effort `high` in its trajectories. That came from
+# the `default:` entry of mini_swe_agent_reasoning.yaml, because that file's `openai/gpt-5.2:
+# xhigh` override never matches the full `openrouter/openai/gpt-5.2` model name the runner looks
+# up. This file pins `high` explicitly under the full name, so the rerun does not depend on that
+# fallthrough.
+default:
+  reasoning_effort: high
+openrouter/openai/gpt-5.2:
+  reasoning_effort: high

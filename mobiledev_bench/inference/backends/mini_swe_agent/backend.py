@@ -39,6 +39,7 @@ class MiniSweAgentBackend(Backend):
             else defaults.max_consecutive_format_errors,
             docker_platform=cli.docker_platform,
             multimodal_regex=cli.multimodal_regex,
+            interface_spec_file=cli.interface_spec_file,
         )
 
     def run_instance(

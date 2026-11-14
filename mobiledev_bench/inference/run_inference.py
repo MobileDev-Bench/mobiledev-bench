@@ -134,6 +134,17 @@ def get_parser() -> ArgumentParser:
         "library's own default - existing text-only runs are unaffected.",
     )
     parser.add_argument(
+        "--interface_spec_file",
+        type=str,
+        required=False,
+        default=None,
+        help="mini_swe_agent backend only. JSONL of per-instance interface specifications "
+        '({"id": "<org>/<repo>:pr-<N>", "spec": "<text>"} per line, built by '
+        "scripts/build_interface_specs.py). When set, each instance's spec is added to its "
+        "prompt as an '## Interface specification' section. Unset (None) leaves the prompt "
+        "unchanged, so existing runs are unaffected.",
+    )
+    parser.add_argument(
         "--docker_platform",
         type=str,
         required=False,
@@ -217,6 +228,7 @@ class CliArgs:
     wall_time_limit_seconds: Optional[int]
     max_consecutive_format_errors: Optional[int]
     multimodal_regex: Optional[str]
+    interface_spec_file: Optional[str]
     docker_platform: Optional[str]
     openhands_pip_spec: Optional[str]
     global_env: Optional[list[str]]
@@ -239,6 +251,7 @@ class CliArgs:
         self._check_agent_backend()
         self._check_model()
         self._check_reasoning_config_file()
+        self._check_interface_spec_file()
         self._check_max_workers()
         self._check_run_name()
         self._check_output_dir()
@@ -281,6 +294,10 @@ class CliArgs:
             self.reasoning_config_file = Path(self.reasoning_config_file)
         if not self.reasoning_config_file.exists():
             raise ValueError(f"reasoning_config_file not found: {self.reasoning_config_file}")
+
+    def _check_interface_spec_file(self):
+        if self.interface_spec_file and not Path(self.interface_spec_file).is_file():
+            raise ValueError(f"interface_spec_file not found: {self.interface_spec_file}")
 
     def _check_max_workers(self):
         if self.max_workers <= 0:
@@ -488,9 +505,13 @@ class CliArgs:
         try:
             if self.use_remote_images and not docker_util.exists(image_name):
                 self.logger.info(f"Pulling image from GHCR: {image_name}")
+                t_pull = time.perf_counter()
                 if not docker_util.pull(image_name, self.ghcr_username, self.logger):
                     self.logger.error(f"Failed to pull image: {image_name}")
                     return None
+                # Not part of a trajectory's elapsed_seconds (that starts after the pull); kept in the
+                # run log so slow pulls under parallel workers are visible.
+                self.logger.info(f"Pulled {instance.pr.id} in {time.perf_counter() - t_pull:.0f}s")
 
             return self.backend.run_instance(
                 instance, self.backend_config, self.traj_dir, self.log_dir

@@ -28,6 +28,24 @@ The script's own defaults (`MODE`, `USE_REMOTE_IMAGES`, `GHCR_USERNAME`, `MAX_WO
 MAX_WORKERS_RUN_INSTANCE=4 STOP_ON_ERROR=true mobiledev_bench/harness/run_evaluation.sh alibaba-qwen-rebuttal-01 openrouter-qwen-qwen3-coder
 ```
 
+That command is just a shorthand - it expands to this `mobiledev-eval` invocation, which you can run directly instead if you want to tweak something the script doesn't expose as a variable, or aren't using the wrapper at all:
+
+```bash
+mobiledev-eval \
+  --mode evaluation \
+  --use_remote_images true \
+  --ghcr_username mobiledev-bench \
+  --patch_files results/alibaba-qwen-rebuttal-01/mini_swe_agent/openrouter-qwen-qwen3-coder/patches/patches.jsonl \
+  --dataset_files data/dataset.jsonl \
+  --workdir results/evaluation/mini_swe_agent/openrouter-qwen-qwen3-coder/work \
+  --repo_dir /tmp \
+  --output_dir results/evaluation/mini_swe_agent/openrouter-qwen-qwen3-coder \
+  --log_dir results/evaluation/mini_swe_agent/openrouter-qwen-qwen3-coder/logs \
+  --max_workers_run_instance 1 \
+  --stop_on_error false \
+  --log_level INFO
+```
+
 To evaluate several models' patches in one call instead, glob `--patch_files` directly with `mobiledev-eval` itself (see below) rather than the wrapper script, which is scoped to one model at a time.
 
 Interrupted or killed partway through? Just rerun the same command with the same `--workdir` (the script always derives the same one from `<run_name>`/`<model_dir>`) - instances that already have a `report.json` are skipped automatically, see "Resume" below.

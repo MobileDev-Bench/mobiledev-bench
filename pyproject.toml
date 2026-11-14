@@ -31,6 +31,10 @@ dependencies = [
     "xmltodict",
 ]
 
+[project.optional-dependencies]
+# Only needed by scripts/build_interface_specs.py (parses post-fix Kotlin/Java/Dart sources).
+specs = ["tree-sitter-language-pack"]
+
 [project.scripts]
 mobiledev-eval = "mobiledev_bench.harness.run_evaluation:main"
 mobiledev-infer = "mobiledev_bench.inference.run_inference:main"

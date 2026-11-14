@@ -1,8 +1,11 @@
+import functools
 import json
 import logging
 import os
+import socket
 import time
 import urllib.parse
+from datetime import datetime, timezone
 from pathlib import Path
 
 from minisweagent.agents.default import DefaultAgent
@@ -38,6 +41,19 @@ for _env_var in ("MSWEA_GLOBAL_COST_LIMIT", "MSWEA_GLOBAL_CALL_LIMIT"):
             ", not a per-instance one - unset it. MiniSweAgentConfig.step_limit/cost_limit already "
             "provide correct per-instance limits."
         )
+
+
+@functools.lru_cache(maxsize=None)
+def _load_interface_specs(path: str) -> dict[str, str]:
+    """instance id ("<org>/<repo>:pr-<N>") -> interface specification text. Cached so the file is
+    read once per run_inference.py invocation, not once per instance."""
+    specs = {}
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            if line.strip():
+                record = json.loads(line)
+                specs[record["id"]] = record.get("spec", "") or ""
+    return specs
 
 
 def get_traj_output_path(traj_dir: Path, instance_id: str) -> Path:
@@ -109,6 +125,41 @@ def _resolve_openrouter_model_name(model: str) -> str:
     return model[len(prefix):] if model.startswith(prefix) else model
 
 
+def _load_avg():
+    """1-minute host load average, or None where the OS does not expose it."""
+    try:
+        return round(os.getloadavg()[0], 2)
+    except (OSError, AttributeError):
+        return None
+
+
+def _new_command_stats():
+    return {"active": False, "commands": 0, "timeouts": 0, "command_seconds": 0.0, "slowest_command_seconds": 0.0}
+
+
+def _instrument_env(env, stats):
+    """Count the agent's shell commands, their total / slowest wall time, and how many hit the
+    per-command timeout (DockerEnvironment.execute reports that as a TimeoutExpired result, not an
+    exception). Only counts while stats["active"] is set, so the scrub / proxy setup and the final
+    patch extraction are not mixed into the agent's numbers. These let a run be audited for
+    load-induced slowness (e.g. several workers sharing one machine) after the fact."""
+    original = env.execute
+
+    def timed_execute(action, *args, **kwargs):
+        t0 = time.perf_counter()
+        result = original(action, *args, **kwargs)
+        if stats["active"]:
+            dt = time.perf_counter() - t0
+            stats["commands"] += 1
+            stats["command_seconds"] += dt
+            stats["slowest_command_seconds"] = max(stats["slowest_command_seconds"], dt)
+            if (result.get("extra") or {}).get("exception_type") == "TimeoutExpired":
+                stats["timeouts"] += 1
+        return result
+
+    env.execute = timed_execute
+
+
 def run_instance(
     instance: Instance,
     cfg: MiniSweAgentConfig,
@@ -134,11 +185,23 @@ def run_instance(
             "(run scripts/download_dataset.py, or check the source if hand-authored)."
         )
 
+    interface_spec = ""
+    if cfg.interface_spec_file:
+        interface_spec = _load_interface_specs(cfg.interface_spec_file).get(instance.pr.id, "")
+        task_logger.info(
+            f"interface spec: {len(interface_spec)} chars" if interface_spec else "interface spec: none"
+        )
+
     fix_patch = ""
     execution_status = "UNKNOWN"
     accumulated_cost = 0.0
     n_calls = 0
     t_start = time.perf_counter()
+    started_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    load_start = _load_avg()
+    t_agent_start = None
+    agent_seconds = 0.0
+    cmd_stats = _new_command_stats()
     env = None
 
     try:
@@ -230,13 +293,24 @@ def run_instance(
             output_path=get_mini_traj_output_path(traj_dir, instance_id),
         )
 
+        _instrument_env(env, cmd_stats)
+        t_agent_start = time.perf_counter()
+        cmd_stats["active"] = True
         try:
-            info = agent.run(task=problem_statement, **framework_template_vars(instance.pr.lang))
+            # StrictUndefined templating (see minisweagent's DefaultAgent._render_template), so
+            # interface_spec is always passed; "" renders the unchanged baseline prompt.
+            info = agent.run(
+                task=problem_statement,
+                interface_spec=interface_spec,
+                **framework_template_vars(instance.pr.lang),
+            )
             execution_status = info.get("exit_status", "UNKNOWN")
         except Exception as e:
             task_logger.error(f"agent.run() failed: {e}", exc_info=True)
             execution_status = f"ERROR: {type(e).__name__}"
         finally:
+            cmd_stats["active"] = False
+            agent_seconds = time.perf_counter() - t_agent_start
             accumulated_cost = agent.cost
             n_calls = agent.n_calls
 
@@ -279,6 +353,22 @@ def run_instance(
         "execution_status": execution_status,
         "accumulated_cost": accumulated_cost,
         "elapsed_seconds": elapsed,
+        # Timing / load audit (added for multi-worker and multi-machine runs). elapsed_seconds is the
+        # whole run_instance (container start + setup + agent + patch extraction); agent_seconds is
+        # only agent.run(); image-pull time happens before run_instance and is logged by
+        # run_inference.py instead.
+        "started_at": started_at,
+        "finished_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "setup_seconds": round(t_agent_start - t_start, 1) if t_agent_start else None,
+        "agent_seconds": round(agent_seconds, 1),
+        "commands": cmd_stats["commands"],
+        "command_seconds": round(cmd_stats["command_seconds"], 1),
+        "slowest_command_seconds": round(cmd_stats["slowest_command_seconds"], 1),
+        "command_timeouts": cmd_stats["timeouts"],
+        "host": socket.gethostname(),
+        "cpu_count": os.cpu_count(),
+        "load_avg_start": load_start,
+        "load_avg_end": _load_avg(),
         "step_limit": cfg.step_limit,
         "cost_limit": cfg.cost_limit,
         "fix_patch": fix_patch,
@@ -290,7 +380,8 @@ def run_instance(
 
     task_logger.info(
         f"Finished {instance.pr.id}: status={execution_status} cost=${accumulated_cost:.4f} "
-        f"calls={n_calls} elapsed={elapsed:.1f}s patch_len={len(fix_patch)}"
+        f"calls={n_calls} elapsed={elapsed:.1f}s patch_len={len(fix_patch)} "
+        f"agent={agent_seconds:.0f}s cmd_timeouts={cmd_stats['timeouts']} load={load_start}->{_load_avg()}"
     )
 
     return Patch(

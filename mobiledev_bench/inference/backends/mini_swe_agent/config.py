@@ -46,6 +46,11 @@ class MiniSweAgentConfig:
     # disables multimodal processing (the library's own default) - see run_inference.py's
     # --multimodal_regex help text for the expected tag format.
     multimodal_regex: Optional[str] = None
+    # Optional JSONL of per-instance interface specifications ({"id": "<org>/<repo>:pr-<N>",
+    # "spec": "<text>"} per line, built by scripts/build_interface_specs.py). When set, an
+    # instance's spec is rendered into the prompt under "## Interface specification"; instances
+    # missing from the file (or with an empty spec) get exactly the unchanged baseline prompt.
+    interface_spec_file: Optional[str] = None
     # Reused as DockerEnvironmentConfig.pull_timeout (image pull) - there's no in-container HTTP
     # server to health-check here, unlike the openhands backend. Matches android-bench's own
     # pull_timeout (600) rather than the shared CLI default (120), which is tuned for openhands.

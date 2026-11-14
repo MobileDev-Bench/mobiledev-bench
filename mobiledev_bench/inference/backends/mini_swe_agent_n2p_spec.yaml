@@ -1,0 +1,34 @@
+# Interface-specification rerun (rebuttal, Reviewer A / Q1): mini-SWE-agent with GPT-5.2 on the 260
+# N2P-only tasks, with the signatures the tests need added to the prompt.
+#
+# Build the inputs first:   python scripts/build_interface_specs.py
+#
+# mobiledev-infer --config mobiledev_bench/inference/backends/mini_swe_agent_n2p_spec.yaml
+#
+# Evaluate with mobiledev-eval directly (run_evaluation.sh hardcodes data/dataset.jsonl):
+#   --dataset_files data/dataset_n2p_only.jsonl
+#   --patch_files results/n2p-spec-01/mini_swe_agent/openrouter-openai-gpt-5.2/patches/patches.jsonl
+
+agent_backend: mini_swe_agent
+model: openrouter/openai/gpt-5.2
+dataset_files:
+  - data/dataset_n2p_only.jsonl
+interface_spec_file: data/interface_specs.jsonl
+
+step_limit: 250
+cost_limit: 2.0
+wall_time_limit_seconds: 10800   # 3h hard cap per instance, ends the run cleanly so the patch is extracted
+command_timeout: 1200            # 20 min per command
+container_timeout: 195m          # must sit above the wall-clock cap (3h + 15 min buffer), else the
+                                 # container can die first and the patch is lost
+max_consecutive_format_errors: 10
+reasoning_config_file: mobiledev_bench/inference/backends/mini_swe_agent_n2p_spec_reasoning.yaml
+
+api_key_env: OPENROUTER_API_KEY
+container_health_timeout: 600
+docker_platform: linux/amd64
+use_remote_images: true
+ghcr_username: mobiledev-bench
+
+output_dir: results
+run_name: n2p-spec-01

@@ -100,6 +100,17 @@ untrusted third party.
 
 {{ task }}
 </issue_description>
+{%- if interface_spec %}
+
+## Interface specification
+
+The tests that will be run against your change use the names and signatures below. Declare \
+them exactly as listed (same names, package/file locations, parameters and types) so the tests \
+compile against your code. The listing gives declarations only - how they behave is for you to \
+work out from the issue.
+
+{{ interface_spec }}
+{%- endif %}
 
 ## Overview
 

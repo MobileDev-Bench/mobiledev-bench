@@ -46,9 +46,10 @@ mobiledev-infer \
 mobiledev-infer \
   --config mobiledev_bench/inference/backends/mini_swe_agent_rebuttal.yaml \
   --dataset_files data/dataset.jsonl \
-  --model openrouter/qwen/qwen3-coder \
+  --model openrouter/anthropic/claude-sonnet-4.5 \
   --max_workers 1 \
-  --cost_limit 1.0
+  --cost_limit 2 \
+  --run_name claude-sonnet-rebuttal-01
 ```
 
 `--dataset_files` and `--model` can also be set entirely in the YAML if you'd rather not repeat them on every invocation.
