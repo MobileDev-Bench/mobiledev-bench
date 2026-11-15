@@ -740,7 +740,7 @@ class CliArgs:
         image_name = instance.name()
         if self.use_remote_images:
             self.logger.info(f"Pulling image from GHCR: {image_name}")
-            if not docker_util.pull(image_name, self.ghcr_username, self.logger):
+            if not docker_util.pull_with_retry(image_name, self.ghcr_username, self.logger):
                 self.logger.error(f"Failed to pull image: {image_name}")
                 raise RuntimeError(f"Failed to pull image: {image_name}")
 

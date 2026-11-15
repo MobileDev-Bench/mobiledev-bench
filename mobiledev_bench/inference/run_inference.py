@@ -506,7 +506,7 @@ class CliArgs:
             if self.use_remote_images and not docker_util.exists(image_name):
                 self.logger.info(f"Pulling image from GHCR: {image_name}")
                 t_pull = time.perf_counter()
-                if not docker_util.pull(image_name, self.ghcr_username, self.logger):
+                if not docker_util.pull_with_retry(image_name, self.ghcr_username, self.logger):
                     self.logger.error(f"Failed to pull image: {image_name}")
                     return None
                 # Not part of a trajectory's elapsed_seconds (that starts after the pull); kept in the

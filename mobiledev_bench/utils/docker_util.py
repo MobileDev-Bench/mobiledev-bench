@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 import logging
+import time
 from pathlib import Path
 from typing import Optional, Union
 
@@ -83,6 +84,19 @@ def pull(image_name: str, ghcr_username: str, logger: logging.Logger) -> bool:
     except Exception as e:
         logger.error(f"Unknown pull error occurred: {e}")
         return False
+
+
+def pull_with_retry(
+    image_name: str, ghcr_username: str, logger: logging.Logger, attempts: int = 3, delay: int = 30
+) -> bool:
+    # containerd pulls fail transiently ("lease does not exist"); one failure must not drop an instance
+    for attempt in range(1, attempts + 1):
+        if pull(image_name, ghcr_username, logger):
+            return True
+        if attempt < attempts:
+            logger.warning(f"Pull of {image_name} failed (attempt {attempt}/{attempts}); retrying in {delay * attempt}s")
+            time.sleep(delay * attempt)
+    return False
 
 
 def delete(image_name: str, logger: logging.Logger, force: bool = True) -> bool:
